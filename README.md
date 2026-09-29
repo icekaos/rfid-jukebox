@@ -26,7 +26,7 @@ Il player predefinito si può cambiare in qualsiasi momento da **Impostazioni �
 Salvati in `.storage/rfid_jukebox.tags` (gestito da `Store`, versionato, incluso nei backup HA automatici — coerente con `sensor.backup_last_successful_automatic_backup`).
 
 ## Riproduzione via MQTT
-Non serve creare un'automazione in Home Assistant. Quando l'integrazione MQTT è configurata, pubblica l'UID del tag come testo semplice sul topic `jukebox/play` (ad esempio direttamente da ESPHome). Il componente cerca l'UID tra le associazioni salvate e riproduce il brano sul player predefinito configurato. Se il tag non è ancora conosciuto, lo salva tra le associazioni da completare: lo trovi nel pannello RFID Jukebox e puoi usare **Aggiorna tag** se il pannello è già aperto.
+Non serve creare un'automazione in Home Assistant. Quando l'integrazione MQTT è configurata, pubblica l'UID del tag come testo semplice sul topic `jukebox/play` (ad esempio direttamente da ESPHome). Il componente cerca l'UID tra le associazioni salvate e riproduce il brano sul player predefinito configurato. Se il tag non è ancora conosciuto, non viene salvato: se il pannello RFID Jukebox è aperto, il suo UID viene inserito automaticamente nel campo della nuova associazione.
 
 Pubblica il messaggio senza retain, così un tag letto in precedenza non viene riprodotto di nuovo quando Home Assistant si riconnette al broker.
 
@@ -36,5 +36,5 @@ Il servizio `rfid_jukebox.play` resta disponibile per chiamate manuali o automaz
 - Il pannello include una barra "Cerca brano (Music Assistant)": interroga `music_assistant.search`, che cerca su tutti i provider collegati al server MA — quindi anche Apple Music, se lo hai aggiunto lì. Clicca un risultato per compilare automaticamente titolo e `media_content_id` nel form "Nuova associazione".
 - La ricerca usa la prima istanza Music Assistant configurata in HA; se ne hai più di una, andrebbe esteso `ws_search_media` per farla scegliere.
 - Il campo `media_content_id` nel pannello va compilato con l'URI che Music Assistant si aspetta (es. `spotify://track/...`, `library://track/123`, o l'equivalente per il provider Apple Music). Con la ricerca sopra di norma non serve più copiarlo a mano.
-- `tag_id` deve combaciare esattamente con lo stato pubblicato dal text_sensor ESPHome (di solito l'UID esadecimale del tag NFC/RFID).
+- `tag_id` deve combaciare esattamente con il payload testuale pubblicato su `jukebox/play` (di solito l'UID esadecimale del tag NFC/RFID).
 - Il servizio logga un warning (non un errore bloccante) se il tag non è mappato, così uno scan accidentale o tag non ancora registrato non rompe nulla.

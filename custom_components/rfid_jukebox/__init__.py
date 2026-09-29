@@ -38,6 +38,13 @@ SERVICE_PLAY_SCHEMA = vol.Schema(
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store: Store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     tags = await store.async_load() or {}
+    unmapped_tags = [
+        tag_id for tag_id, tag in tags.items() if not tag.get("media_content_id")
+    ]
+    for tag_id in unmapped_tags:
+        tags.pop(tag_id)
+    if unmapped_tags:
+        await store.async_save(tags)
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN]["store"] = store
     hass.data[DOMAIN]["tags"] = tags
@@ -76,12 +83,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         tags = hass.data[DOMAIN]["tags"]
         tag = tags.get(tag_id)
         if tag is None:
-            tags[tag_id] = {"title": "", "media_content_id": ""}
-            await _save(hass)
-            _LOGGER.info("Nuovo tag RFID aggiunto alle associazioni: %s", tag_id)
+            _LOGGER.warning("Tag RFID sconosciuto: %s", tag_id)
             return
         if not tag.get("media_content_id"):
-            _LOGGER.info("Tag RFID in attesa di associazione: %s", tag_id)
+            _LOGGER.warning("Tag RFID senza brano associato: %s", tag_id)
             return
 
         # entry.options viene aggiornato in-place quando si salva l'options flow,
@@ -115,8 +120,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def handle_mqtt_message(message) -> None:
         tag_id = message.payload.strip()
-        if tag_id:
-            await async_play_tag(tag_id)
+        if not tag_id:
+            return
+        tag = hass.data[DOMAIN]["tags"].get(tag_id)
+        if tag is None or not tag.get("media_content_id"):
+            if tag is not None:
+                hass.data[DOMAIN]["tags"].pop(tag_id, None)
+                await _save(hass)
+            hass.bus.async_fire(
+                f"{DOMAIN}_tag_scanned", {"tag_id": tag_id}
+            )
+            return
+        await async_play_tag(tag_id)
 
     hass.data[DOMAIN]["mqtt_unsubscribe"] = await mqtt.async_subscribe(
         hass, "jukebox/play", handle_mqtt_message

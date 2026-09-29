@@ -6,7 +6,30 @@ class RfidJukeboxPanel extends HTMLElement {
       this._render();
       this._loadTags();
       this._loadConfig();
+      this._subscribeScans();
     }
+  }
+
+  async _subscribeScans() {
+    try {
+      this._unsubscribeScans = await this._hass.connection.subscribeEvents(
+        (event) => this._handleTagScanned(event.data.tag_id),
+        "rfid_jukebox_tag_scanned"
+      );
+    } catch (err) {
+      console.error("Impossibile ascoltare le scansioni RFID:", err);
+    }
+  }
+
+  _handleTagScanned(tagId) {
+    if (typeof tagId !== "string" || !tagId.trim()) return;
+    const normalizedTagId = tagId.trim();
+    const tagInput = this.querySelector("#new-tag");
+    tagInput.value = normalizedTagId;
+    this.querySelector("#scan-status").textContent =
+      `Tag acquisito: ${normalizedTagId}. Completa l'abbinamento del brano.`;
+    tagInput.focus({ preventScroll: true });
+    tagInput.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   async _searchMedia() {
@@ -142,9 +165,7 @@ class RfidJukeboxPanel extends HTMLElement {
           gap: 16px;
           margin-bottom: 16px;
         }
-        .section-meta { display: flex; align-items: center; gap: 10px; }
         .count { color: var(--secondary-text-color); font-size: 13px; }
-        .icon-button { width: 40px; min-width: 40px; padding: 8px; }
         .table-wrap { overflow-x: auto; border: 1px solid var(--divider-color); border-radius: 6px; }
         table { width: 100%; min-width: 760px; border-collapse: collapse; }
         th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--divider-color); }
@@ -160,8 +181,6 @@ class RfidJukeboxPanel extends HTMLElement {
           color: var(--primary-text-color);
           background: var(--card-background-color);
           border: 1px solid var(--divider-color);
-            tbody tr.pending-row { background: color-mix(in srgb, var(--warning-color, #e6a23c) 8%, var(--card-background-color)); }
-            .pending-label { display: block; margin-top: 5px; color: var(--warning-color, #a56600); font-family: var(--paper-font-body1_-_font-family, sans-serif); font-size: 12px; }
           font: inherit;
         }
         input:focus { outline: 2px solid var(--primary-color); outline-offset: 1px; }
@@ -183,6 +202,7 @@ class RfidJukeboxPanel extends HTMLElement {
           cursor: pointer;
           transition: background-color 120ms ease, transform 120ms ease;
         }
+        button[hidden] { display: none; }
         button:hover { background: color-mix(in srgb, var(--primary-color) 10%, var(--card-background-color)); }
         button:active { transform: translateY(1px); }
         button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
@@ -197,6 +217,8 @@ class RfidJukeboxPanel extends HTMLElement {
         .result-artist { color: var(--secondary-text-color); }
         .search-message { padding: 12px 2px; color: var(--secondary-text-color); font-size: 14px; }
         .mapping-form { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(160px, 1fr) minmax(220px, 1.5fr) auto; gap: 10px; }
+        .scan-status { min-height: 20px; margin: 0 0 12px; color: var(--success-color, var(--primary-color)); font-size: 13px; }
+        .scan-status:empty { display: none; }
         .empty-state { padding: 24px; color: var(--secondary-text-color); text-align: center; }
         @media (max-width: 700px) {
           rfid-jukebox-panel { padding: 18px 14px 32px; }
@@ -220,18 +242,13 @@ class RfidJukeboxPanel extends HTMLElement {
         </header>
 
         <section class="section">
-          <div class="section-heading">
-            <h2>Associazioni</h2>
-            <div class="section-meta">
-              <span class="count" id="mapping-count">0 tag</span>
-              <button class="icon-button" id="refresh-btn" type="button" title="Aggiorna tag" aria-label="Aggiorna tag"><ha-icon icon="mdi:refresh"></ha-icon></button>
-            </div>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Tag ID</th><th>Titolo</th><th>Media content ID</th><th>Azioni</th></tr></thead>
-              <tbody id="rows"></tbody>
-            </table>
+          <div class="section-heading"><h2>Nuova associazione</h2></div>
+          <p id="scan-status" class="scan-status" aria-live="polite"></p>
+          <div class="mapping-form">
+            <input id="new-tag" placeholder="Tag ID (UID)" aria-label="Tag ID (UID)" />
+            <input id="new-title" placeholder="Titolo" aria-label="Titolo" />
+            <input id="new-media" placeholder="media_content_id (es. spotify://...)" aria-label="Media content ID" />
+            <button class="primary-button" id="add-btn" type="button"><ha-icon icon="mdi:plus"></ha-icon><span>Aggiungi</span></button>
           </div>
         </section>
 
@@ -245,21 +262,21 @@ class RfidJukeboxPanel extends HTMLElement {
         </section>
 
         <section class="section">
-          <div class="section-heading"><h2>Nuova associazione</h2></div>
-          <div class="mapping-form">
-            <input id="new-tag" placeholder="Tag ID (UID)" aria-label="Tag ID (UID)" />
-            <input id="new-title" placeholder="Titolo" aria-label="Titolo" />
-            <input id="new-media" placeholder="media_content_id (es. spotify://...)" aria-label="Media content ID" />
-            <button class="primary-button" id="add-btn" type="button"><ha-icon icon="mdi:plus"></ha-icon><span>Aggiungi</span></button>
+          <div class="section-heading">
+            <h2>Associazioni</h2>
+            <span class="count" id="mapping-count">0 tag</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Tag ID</th><th>Titolo</th><th>Media content ID</th><th>Azioni</th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
           </div>
         </section>
       </main>
     `;
     this.querySelector("#search-btn").addEventListener("click", () =>
       this._searchMedia()
-    );
-    this.querySelector("#refresh-btn").addEventListener("click", () =>
-      this._loadTags()
     );
     this.querySelector("#search-query").addEventListener("keydown", (e) => {
       if (e.key === "Enter") this._searchMedia();
@@ -300,14 +317,14 @@ class RfidJukeboxPanel extends HTMLElement {
       const titleCell = document.createElement("td");
       const titleInput = document.createElement("input");
       titleInput.className = "table-input";
-      titleInput.value = tag.title;
+      titleInput.value = tag.title || "";
       titleInput.dataset.field = "title";
       titleInput.setAttribute("aria-label", `Titolo per ${tagId}`);
       titleCell.appendChild(titleInput);
       const mediaCell = document.createElement("td");
       const mediaInput = document.createElement("input");
       mediaInput.className = "table-input";
-      mediaInput.value = tag.media_content_id;
+      mediaInput.value = tag.media_content_id || "";
       mediaInput.dataset.field = "media";
       mediaInput.setAttribute("aria-label", `Media content ID per ${tagId}`);
       mediaCell.appendChild(mediaInput);
@@ -317,6 +334,7 @@ class RfidJukeboxPanel extends HTMLElement {
       const saveButton = document.createElement("button");
       saveButton.className = "primary-button";
       saveButton.type = "button";
+      saveButton.hidden = true;
       saveButton.innerHTML = '<ha-icon icon="mdi:content-save-outline"></ha-icon><span>Salva</span>';
       const deleteButton = document.createElement("button");
       deleteButton.className = "delete";
@@ -325,6 +343,15 @@ class RfidJukeboxPanel extends HTMLElement {
       actions.append(saveButton, deleteButton);
       actionsCell.appendChild(actions);
       tr.append(tagCell, titleCell, mediaCell, actionsCell);
+      const originalTitle = titleInput.value;
+      const originalMedia = mediaInput.value;
+      const updateSaveVisibility = () => {
+        saveButton.hidden =
+          titleInput.value === originalTitle &&
+          mediaInput.value === originalMedia;
+      };
+      titleInput.addEventListener("input", updateSaveVisibility);
+      mediaInput.addEventListener("input", updateSaveVisibility);
       saveButton.addEventListener("click", () => {
         const title = tr.querySelector('[data-field="title"]').value;
         const media = tr.querySelector('[data-field="media"]').value;
