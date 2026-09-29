@@ -1,0 +1,18 @@
+play:
+  name: Riproduci tag RFID
+  description: Riproduce il brano associato a un tag RFID.
+  fields:
+    tag_id:
+      name: ID tag
+      description: UID del tag RFID associato al brano.
+      required: true
+      selector:
+        text:
+    media_player:
+      name: Media player
+      description: Player Music Assistant da usare al posto del predefinito.
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: media_player

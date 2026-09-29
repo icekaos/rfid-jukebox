@@ -14,6 +14,7 @@ from homeassistant.components.frontend import (
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
 
@@ -37,6 +38,13 @@ SERVICE_PLAY_SCHEMA = vol.Schema(
 )
 
 
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(PANEL_URL, str(PANEL_PATH), False)]
+    )
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store: Store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     last_scan_store: Store = Store(hass, STORAGE_VERSION, LAST_SCAN_STORAGE_KEY)
@@ -55,10 +63,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN]["last_scanned_tag_id"] = last_scan.get("tag_id")
     hass.data[DOMAIN]["tags"] = tags
     hass.data[DOMAIN]["entry"] = entry
-
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(PANEL_URL, str(PANEL_PATH), False)]
-    )
 
     async_register_built_in_panel(
         hass,
@@ -109,12 +113,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
             return
 
-        await hass.services.async_call(
-            "music_assistant",
-            "play_media",
-            {"entity_id": media_player, "media_id": tag["media_content_id"]},
-            blocking=True,
-        )
+        try:
+            await hass.services.async_call(
+                "music_assistant",
+                "play_media",
+                {
+                    "entity_id": media_player,
+                    "media_id": tag["media_content_id"],
+                },
+                blocking=True,
+            )
+        except HomeAssistantError as err:
+            _LOGGER.warning(
+                "Riproduzione del tag %s fallita: %s. Verifica il media_content_id "
+                "nell'associazione Music Assistant.",
+                tag_id,
+                err,
+            )
 
     async def handle_play(call: ServiceCall) -> None:
         await async_play_tag(
