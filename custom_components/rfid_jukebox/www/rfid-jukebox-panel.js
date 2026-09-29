@@ -1,4 +1,9 @@
 class RfidJukeboxPanel extends HTMLElement {
+  constructor() {
+    super();
+    this._root = this.attachShadow({ mode: "open" });
+  }
+
   set hass(hass) {
     this._hass = hass;
     if (!this._initialized) {
@@ -16,6 +21,10 @@ class RfidJukeboxPanel extends HTMLElement {
         (event) => this._handleTagScanned(event.data.tag_id),
         "rfid_jukebox_tag_scanned"
       );
+      const { tag_id: latestTagId } = await this._hass.callWS({
+        type: "rfid_jukebox/get_last_scan",
+      });
+      this._handleTagScanned(latestTagId);
     } catch (err) {
       console.error("Impossibile ascoltare le scansioni RFID:", err);
     }
@@ -24,18 +33,18 @@ class RfidJukeboxPanel extends HTMLElement {
   _handleTagScanned(tagId) {
     if (typeof tagId !== "string" || !tagId.trim()) return;
     const normalizedTagId = tagId.trim();
-    const tagInput = this.querySelector("#new-tag");
+    const tagInput = this._root.querySelector("#new-tag");
     tagInput.value = normalizedTagId;
-    this.querySelector("#scan-status").textContent =
+    this._root.querySelector("#scan-status").textContent =
       `Tag acquisito: ${normalizedTagId}. Completa l'abbinamento del brano.`;
     tagInput.focus({ preventScroll: true });
     tagInput.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   async _searchMedia() {
-    const query = this.querySelector("#search-query").value.trim();
+    const query = this._root.querySelector("#search-query").value.trim();
     if (!query) return;
-    const list = this.querySelector("#search-results");
+    const list = this._root.querySelector("#search-results");
     const showMessage = (message) => {
       const item = document.createElement("li");
       item.className = "search-message";
@@ -53,30 +62,30 @@ class RfidJukeboxPanel extends HTMLElement {
         return;
       }
       list.replaceChildren();
-      for (const r of results) {
-        const li = document.createElement("li");
-        li.className = "search-result";
+      for (const result of results) {
+        const item = document.createElement("li");
+        item.className = "search-result";
         const button = document.createElement("button");
         button.className = "result-button";
         button.type = "button";
         const title = document.createElement("span");
         title.className = "result-title";
-        title.textContent = r.name;
+        title.textContent = result.name;
         button.appendChild(title);
-        if (r.artist) {
+        if (result.artist) {
           const artist = document.createElement("span");
           artist.className = "result-artist";
-          artist.textContent = r.artist;
+          artist.textContent = result.artist;
           button.appendChild(artist);
         }
         button.addEventListener("click", () => {
-          this.querySelector("#new-title").value = r.artist
-            ? `${r.name} — ${r.artist}`
-            : r.name;
-          this.querySelector("#new-media").value = r.uri;
+          this._root.querySelector("#new-title").value = result.artist
+            ? `${result.name} — ${result.artist}`
+            : result.name;
+          this._root.querySelector("#new-media").value = result.uri;
         });
-        li.appendChild(button);
-        list.appendChild(li);
+        item.appendChild(button);
+        list.appendChild(item);
       }
     } catch (err) {
       showMessage(`Errore: ${err.message || err}`);
@@ -89,9 +98,11 @@ class RfidJukeboxPanel extends HTMLElement {
   }
 
   async _loadConfig() {
-    const config = await this._hass.callWS({ type: "rfid_jukebox/get_config" });
-    const el = this.querySelector("#default-player");
-    el.textContent = config.default_media_player
+    const config = await this._hass.callWS({
+      type: "rfid_jukebox/get_config",
+    });
+    const element = this._root.querySelector("#default-player");
+    element.textContent = config.default_media_player
       ? config.default_media_player
       : "non impostato";
   }
@@ -112,9 +123,9 @@ class RfidJukeboxPanel extends HTMLElement {
   }
 
   _render() {
-    this.innerHTML = `
+    this._root.innerHTML = `
       <style>
-        rfid-jukebox-panel {
+        :host {
           display: block;
           padding: 28px clamp(16px, 4vw, 48px) 48px;
           color: var(--primary-text-color);
@@ -181,6 +192,7 @@ class RfidJukeboxPanel extends HTMLElement {
           color: var(--primary-text-color);
           background: var(--card-background-color);
           border: 1px solid var(--divider-color);
+          border-radius: 4px;
           font: inherit;
         }
         input:focus { outline: 2px solid var(--primary-color); outline-offset: 1px; }
@@ -221,7 +233,7 @@ class RfidJukeboxPanel extends HTMLElement {
         .scan-status:empty { display: none; }
         .empty-state { padding: 24px; color: var(--secondary-text-color); text-align: center; }
         @media (max-width: 700px) {
-          rfid-jukebox-panel { padding: 18px 14px 32px; }
+          :host { padding: 18px 14px 32px; }
           .page-header { align-items: flex-start; flex-direction: column; gap: 16px; }
           .player-status { width: 100%; max-width: none; }
           .mapping-form { grid-template-columns: 1fr; }
@@ -275,42 +287,42 @@ class RfidJukeboxPanel extends HTMLElement {
         </section>
       </main>
     `;
-    this.querySelector("#search-btn").addEventListener("click", () =>
+    this._root.querySelector("#search-btn").addEventListener("click", () =>
       this._searchMedia()
     );
-    this.querySelector("#search-query").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") this._searchMedia();
+    this._root.querySelector("#search-query").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") this._searchMedia();
     });
-    this.querySelector("#add-btn").addEventListener("click", () => {
-      const tagId = this.querySelector("#new-tag").value.trim();
-      const title = this.querySelector("#new-title").value.trim();
-      const media = this.querySelector("#new-media").value.trim();
+    this._root.querySelector("#add-btn").addEventListener("click", () => {
+      const tagId = this._root.querySelector("#new-tag").value.trim();
+      const title = this._root.querySelector("#new-title").value.trim();
+      const media = this._root.querySelector("#new-media").value.trim();
       if (tagId && title && media) {
         this._saveTag(tagId, title, media);
-        this.querySelector("#new-tag").value = "";
-        this.querySelector("#new-title").value = "";
-        this.querySelector("#new-media").value = "";
+        this._root.querySelector("#new-tag").value = "";
+        this._root.querySelector("#new-title").value = "";
+        this._root.querySelector("#new-media").value = "";
       }
     });
   }
 
   _renderTable() {
-    const rows = this.querySelector("#rows");
+    const rows = this._root.querySelector("#rows");
     rows.replaceChildren();
     const tags = Object.entries(this._tags || {});
-    this.querySelector("#mapping-count").textContent = `${tags.length} tag`;
+    this._root.querySelector("#mapping-count").textContent = `${tags.length} tag`;
     if (!tags.length) {
-      const tr = document.createElement("tr");
+      const row = document.createElement("tr");
       const cell = document.createElement("td");
       cell.className = "empty-state";
       cell.colSpan = 4;
       cell.textContent = "Nessuna associazione";
-      tr.appendChild(cell);
-      rows.appendChild(tr);
+      row.appendChild(cell);
+      rows.appendChild(row);
       return;
     }
     for (const [tagId, tag] of tags) {
-      const tr = document.createElement("tr");
+      const row = document.createElement("tr");
       const tagCell = document.createElement("td");
       tagCell.className = "tag-id";
       tagCell.textContent = tagId;
@@ -342,7 +354,7 @@ class RfidJukeboxPanel extends HTMLElement {
       deleteButton.innerHTML = '<ha-icon icon="mdi:delete-outline"></ha-icon><span>Elimina</span>';
       actions.append(saveButton, deleteButton);
       actionsCell.appendChild(actions);
-      tr.append(tagCell, titleCell, mediaCell, actionsCell);
+      row.append(tagCell, titleCell, mediaCell, actionsCell);
       const originalTitle = titleInput.value;
       const originalMedia = mediaInput.value;
       const updateSaveVisibility = () => {
@@ -353,12 +365,10 @@ class RfidJukeboxPanel extends HTMLElement {
       titleInput.addEventListener("input", updateSaveVisibility);
       mediaInput.addEventListener("input", updateSaveVisibility);
       saveButton.addEventListener("click", () => {
-        const title = tr.querySelector('[data-field="title"]').value;
-        const media = tr.querySelector('[data-field="media"]').value;
-        this._saveTag(tagId, title, media);
+        this._saveTag(tagId, titleInput.value, mediaInput.value);
       });
       deleteButton.addEventListener("click", () => this._deleteTag(tagId));
-      rows.appendChild(tr);
+      rows.appendChild(row);
     }
   }
 }

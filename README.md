@@ -26,7 +26,7 @@ Il player predefinito si può cambiare in qualsiasi momento da **Impostazioni �
 Salvati in `.storage/rfid_jukebox.tags` (gestito da `Store`, versionato, incluso nei backup HA automatici — coerente con `sensor.backup_last_successful_automatic_backup`).
 
 ## Riproduzione via MQTT
-Non serve creare un'automazione in Home Assistant. Quando l'integrazione MQTT è configurata, pubblica l'UID del tag come testo semplice sul topic `jukebox/play` (ad esempio direttamente da ESPHome). Il componente cerca l'UID tra le associazioni salvate e riproduce il brano sul player predefinito configurato. Se il tag non è ancora conosciuto, non viene salvato: se il pannello RFID Jukebox è aperto, il suo UID viene inserito automaticamente nel campo della nuova associazione.
+Non serve creare un'automazione in Home Assistant. Quando l'integrazione MQTT è configurata, pubblica l'UID del tag come testo semplice sul topic `jukebox/play` (ad esempio direttamente da ESPHome). Il componente cerca l'UID tra le associazioni salvate e riproduce il brano sul player predefinito configurato. Se il tag non è ancora conosciuto, il suo UID viene conservato separatamente dalle associazioni e inserito automaticamente nel campo della nuova associazione, anche se il pannello viene aperto dopo la scansione. Il valore temporaneo viene cancellato quando l'associazione viene salvata.
 
 Pubblica il messaggio senza retain, così un tag letto in precedenza non viene riprodotto di nuovo quando Home Assistant si riconnette al broker.
 

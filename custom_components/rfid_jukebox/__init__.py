@@ -21,7 +21,9 @@ from .const import CONF_DEFAULT_MEDIA_PLAYER, DOMAIN
 
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.tags"
+LAST_SCAN_STORAGE_KEY = f"{DOMAIN}.last_scan"
 PANEL_URL = "/api/rfid_jukebox/panel/rfid-jukebox-panel.js"
+PANEL_MODULE_URL = f"{PANEL_URL}?v=2"
 PANEL_PATH = Path(__file__).parent / "www" / "rfid-jukebox-panel.js"
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,7 +39,9 @@ SERVICE_PLAY_SCHEMA = vol.Schema(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store: Store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+    last_scan_store: Store = Store(hass, STORAGE_VERSION, LAST_SCAN_STORAGE_KEY)
     tags = await store.async_load() or {}
+    last_scan = await last_scan_store.async_load() or {}
     unmapped_tags = [
         tag_id for tag_id, tag in tags.items() if not tag.get("media_content_id")
     ]
@@ -47,11 +51,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await store.async_save(tags)
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN]["store"] = store
+    hass.data[DOMAIN]["last_scan_store"] = last_scan_store
+    hass.data[DOMAIN]["last_scanned_tag_id"] = last_scan.get("tag_id")
     hass.data[DOMAIN]["tags"] = tags
     hass.data[DOMAIN]["entry"] = entry
 
     await hass.http.async_register_static_paths(
-        [StaticPathConfig(PANEL_URL, str(PANEL_PATH), True)]
+        [StaticPathConfig(PANEL_URL, str(PANEL_PATH), False)]
     )
 
     async_register_built_in_panel(
@@ -65,7 +71,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "name": "rfid-jukebox-panel",
                 "embed_iframe": False,
                 "trust_external": False,
-                "module_url": PANEL_URL,
+                "module_url": PANEL_MODULE_URL,
             }
         },
         require_admin=True,
@@ -76,6 +82,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     websocket_api.async_register_command(hass, ws_delete_tag)
     websocket_api.async_register_command(hass, ws_get_config)
     websocket_api.async_register_command(hass, ws_search_media)
+    websocket_api.async_register_command(hass, ws_get_last_scan)
 
     async def async_play_tag(tag_id: str, media_player: str | None = None) -> None:
         if not tag_id.strip():
@@ -127,6 +134,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if tag is not None:
                 hass.data[DOMAIN]["tags"].pop(tag_id, None)
                 await _save(hass)
+            hass.data[DOMAIN]["last_scanned_tag_id"] = tag_id
+            await hass.data[DOMAIN]["last_scan_store"].async_save(
+                {"tag_id": tag_id}
+            )
             hass.bus.async_fire(
                 f"{DOMAIN}_tag_scanned", {"tag_id": tag_id}
             )
@@ -173,6 +184,9 @@ async def ws_save_tag(hass, connection, msg):
         "media_content_id": msg["media_content_id"],
     }
     await _save(hass)
+    if hass.data[DOMAIN].get("last_scanned_tag_id") == msg["tag_id"]:
+        hass.data[DOMAIN]["last_scanned_tag_id"] = None
+        await hass.data[DOMAIN]["last_scan_store"].async_remove()
     connection.send_result(msg["id"], {})
 
 
@@ -193,6 +207,14 @@ async def ws_get_config(hass, connection, msg):
     connection.send_result(
         msg["id"],
         {"default_media_player": entry.options.get(CONF_DEFAULT_MEDIA_PLAYER)},
+    )
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_last_scan"})
+@websocket_api.async_response
+async def ws_get_last_scan(hass, connection, msg):
+    connection.send_result(
+        msg["id"], {"tag_id": hass.data[DOMAIN].get("last_scanned_tag_id")}
     )
 
 
