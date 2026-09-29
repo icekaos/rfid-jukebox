@@ -155,7 +155,10 @@ class RfidJukeboxPanel extends HTMLElement {
     titleElement.textContent =
       player.attributes.media_title || "Riproduzione in corso";
     artistElement.textContent = player.attributes.media_artist || "";
-    const imageUrl = player.attributes.entity_picture;
+    const imageUrl =
+      player.attributes.entity_picture_local ||
+      player.attributes.entity_picture ||
+      player.attributes.media_image_url;
     coverElement.hidden = !imageUrl;
     if (imageUrl) {
       coverElement.onerror = () => {
@@ -240,16 +243,20 @@ class RfidJukeboxPanel extends HTMLElement {
         #now-playing-title { overflow-wrap: anywhere; font-size: 15px; font-weight: 600; }
         #now-playing-artist { color: var(--secondary-text-color); font-size: 13px; }
         .cover-art, .cover-placeholder {
-          display: grid;
-          place-items: center;
           width: 56px;
           height: 56px;
           flex: 0 0 56px;
           overflow: hidden;
           border-radius: 4px;
         }
-        .cover-art { object-fit: cover; }
-        .cover-placeholder { color: var(--secondary-text-color); background: var(--secondary-background-color); }
+        .cover-art { display: block; object-fit: cover; }
+        .cover-art[hidden] { display: none; }
+        .cover-placeholder {
+          display: grid;
+          place-items: center;
+          color: var(--secondary-text-color);
+          background: var(--secondary-background-color);
+        }
         .cover-placeholder ha-icon { --mdc-icon-size: 26px; }
         .section { padding: 24px 0; border-top: 1px solid var(--divider-color); }
         .section-heading {

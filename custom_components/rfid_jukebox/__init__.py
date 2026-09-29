@@ -24,7 +24,7 @@ STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.tags"
 LAST_SCAN_STORAGE_KEY = f"{DOMAIN}.last_scan"
 PANEL_URL = "/api/rfid_jukebox/panel/rfid-jukebox-panel.js"
-PANEL_MODULE_URL = f"{PANEL_URL}?v=2"
+PANEL_MODULE_URL = f"{PANEL_URL}?v=4"
 PANEL_PATH = Path(__file__).parent / "www" / "rfid-jukebox-panel.js"
 
 _LOGGER = logging.getLogger(__name__)
