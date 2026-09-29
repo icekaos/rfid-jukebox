@@ -274,6 +274,7 @@ class RfidJukeboxPanel extends HTMLElement {
         tbody tr:last-child td { border-bottom: 0; }
         tbody tr:hover { background: color-mix(in srgb, var(--primary-color) 4%, var(--card-background-color)); }
         .tag-id { min-width: 150px; font-family: var(--paper-font-code1_-_font-family, monospace); font-size: 13px; overflow-wrap: anywhere; }
+        .media-content-id { min-width: 240px; font-family: var(--paper-font-code1_-_font-family, monospace); font-size: 12px; overflow-wrap: anywhere; }
         .table-input, input {
           width: 100%;
           min-width: 0;
@@ -427,46 +428,20 @@ class RfidJukeboxPanel extends HTMLElement {
       tagCell.className = "tag-id";
       tagCell.textContent = tagId;
       const titleCell = document.createElement("td");
-      const titleInput = document.createElement("input");
-      titleInput.className = "table-input";
-      titleInput.value = tag.title || "";
-      titleInput.dataset.field = "title";
-      titleInput.setAttribute("aria-label", `Titolo per ${tagId}`);
-      titleCell.appendChild(titleInput);
+      titleCell.textContent = tag.title || "";
       const mediaCell = document.createElement("td");
-      const mediaInput = document.createElement("input");
-      mediaInput.className = "table-input";
-      mediaInput.value = tag.media_content_id || "";
-      mediaInput.dataset.field = "media";
-      mediaInput.setAttribute("aria-label", `Media content ID per ${tagId}`);
-      mediaCell.appendChild(mediaInput);
+      mediaCell.className = "media-content-id";
+      mediaCell.textContent = tag.media_content_id || "";
       const actionsCell = document.createElement("td");
       const actions = document.createElement("div");
       actions.className = "actions";
-      const saveButton = document.createElement("button");
-      saveButton.className = "primary-button";
-      saveButton.type = "button";
-      saveButton.hidden = true;
-      saveButton.innerHTML = '<ha-icon icon="mdi:content-save-outline"></ha-icon><span>Salva</span>';
       const deleteButton = document.createElement("button");
       deleteButton.className = "delete";
       deleteButton.type = "button";
       deleteButton.innerHTML = '<ha-icon icon="mdi:delete-outline"></ha-icon><span>Elimina</span>';
-      actions.append(saveButton, deleteButton);
+      actions.appendChild(deleteButton);
       actionsCell.appendChild(actions);
       row.append(tagCell, titleCell, mediaCell, actionsCell);
-      const originalTitle = titleInput.value;
-      const originalMedia = mediaInput.value;
-      const updateSaveVisibility = () => {
-        saveButton.hidden =
-          titleInput.value === originalTitle &&
-          mediaInput.value === originalMedia;
-      };
-      titleInput.addEventListener("input", updateSaveVisibility);
-      mediaInput.addEventListener("input", updateSaveVisibility);
-      saveButton.addEventListener("click", () => {
-        this._saveTag(tagId, titleInput.value, mediaInput.value);
-      });
       deleteButton.addEventListener("click", () => this._deleteTag(tagId));
       rows.appendChild(row);
     }

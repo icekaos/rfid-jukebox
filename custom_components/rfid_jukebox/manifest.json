@@ -6,5 +6,5 @@
   "dependencies": ["mqtt"],
   "documentation": "https://github.com/tuo-user/rfid_jukebox",
   "iot_class": "local_push",
-  "version": "1.0.2"
+  "version": "1.0.3"
 }
