@@ -7,7 +7,10 @@ from pathlib import Path
 import voluptuous as vol
 
 from homeassistant.components import websocket_api
-from homeassistant.components.frontend import async_register_panel, async_remove_panel
+from homeassistant.components.frontend import (
+    async_register_built_in_panel,
+    async_remove_panel,
+)
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -44,13 +47,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         [StaticPathConfig(PANEL_URL, str(PANEL_PATH), True)]
     )
 
-    async_register_panel(
+    async_register_built_in_panel(
         hass,
-        frontend_url_path="rfid-jukebox",
-        webcomponent_name="rfid-jukebox-panel",
+        component_name="custom",
         sidebar_title="Jukebox RFID",
         sidebar_icon="mdi:radio-tower",
-        module_url=PANEL_URL,
+        frontend_url_path="rfid-jukebox",
+        config={
+            "_panel_custom": {
+                "name": "rfid-jukebox-panel",
+                "embed_iframe": False,
+                "trust_external": False,
+                "module_url": PANEL_URL,
+            }
+        },
         require_admin=True,
     )
 
