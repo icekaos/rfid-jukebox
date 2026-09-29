@@ -270,6 +270,7 @@ async def ws_search_media(hass, connection, msg):
         {
             "uri": item.get("uri"),
             "name": item.get("name"),
+            "image": item.get("image"),
             "artist": ", ".join(
                 a.get("name", "") for a in (item.get("artists") or [])
             ),

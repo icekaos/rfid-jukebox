@@ -13,6 +13,7 @@ class RfidJukeboxPanel extends HTMLElement {
       this._loadConfig();
       this._subscribeScans();
     }
+    this._updateNowPlaying();
   }
 
   async _subscribeScans() {
@@ -68,16 +69,34 @@ class RfidJukeboxPanel extends HTMLElement {
         const button = document.createElement("button");
         button.className = "result-button";
         button.type = "button";
+        let cover;
+        if (result.image) {
+          const image = document.createElement("img");
+          image.className = "cover-art";
+          image.src = result.image;
+          image.alt = "";
+          image.loading = "lazy";
+          image.addEventListener("error", () => {
+            image.replaceWith(this._createCoverPlaceholder());
+          });
+          cover = image;
+        } else {
+          cover = this._createCoverPlaceholder();
+        }
+        button.appendChild(cover);
+        const metadata = document.createElement("span");
+        metadata.className = "result-metadata";
         const title = document.createElement("span");
         title.className = "result-title";
         title.textContent = result.name;
-        button.appendChild(title);
+        metadata.appendChild(title);
         if (result.artist) {
           const artist = document.createElement("span");
           artist.className = "result-artist";
           artist.textContent = result.artist;
-          button.appendChild(artist);
+          metadata.appendChild(artist);
         }
+        button.appendChild(metadata);
         button.addEventListener("click", () => {
           this._root.querySelector("#new-title").value = result.artist
             ? `${result.name} — ${result.artist}`
@@ -97,14 +116,55 @@ class RfidJukeboxPanel extends HTMLElement {
     this._renderTable();
   }
 
+  _createCoverPlaceholder() {
+    const placeholder = document.createElement("span");
+    placeholder.className = "cover-placeholder";
+    placeholder.innerHTML = '<ha-icon icon="mdi:music-note"></ha-icon>';
+    return placeholder;
+  }
+
   async _loadConfig() {
     const config = await this._hass.callWS({
       type: "rfid_jukebox/get_config",
     });
     const element = this._root.querySelector("#default-player");
+    this._defaultMediaPlayer = config.default_media_player;
     element.textContent = config.default_media_player
       ? config.default_media_player
       : "non impostato";
+    this._updateNowPlaying();
+  }
+
+  _updateNowPlaying() {
+    if (!this._initialized) return;
+    const titleElement = this._root.querySelector("#now-playing-title");
+    const artistElement = this._root.querySelector("#now-playing-artist");
+    const coverElement = this._root.querySelector("#now-playing-cover");
+    const player = this._defaultMediaPlayer
+      ? this._hass.states[this._defaultMediaPlayer]
+      : null;
+
+    if (!player || player.state !== "playing") {
+      titleElement.textContent = "Nessun brano in riproduzione";
+      artistElement.textContent = "";
+      coverElement.hidden = true;
+      coverElement.removeAttribute("src");
+      return;
+    }
+
+    titleElement.textContent =
+      player.attributes.media_title || "Riproduzione in corso";
+    artistElement.textContent = player.attributes.media_artist || "";
+    const imageUrl = player.attributes.entity_picture;
+    coverElement.hidden = !imageUrl;
+    if (imageUrl) {
+      coverElement.onerror = () => {
+        coverElement.hidden = true;
+      };
+      if (coverElement.getAttribute("src") !== imageUrl) {
+        coverElement.src = imageUrl;
+      }
+    }
   }
 
   async _saveTag(tagId, title, mediaContentId) {
@@ -168,6 +228,29 @@ class RfidJukeboxPanel extends HTMLElement {
         }
         .player-label { color: var(--secondary-text-color); font-size: 12px; }
         #default-player { overflow-wrap: anywhere; font-size: 14px; font-weight: 600; }
+        .now-playing {
+          display: flex;
+          flex: 1;
+          min-width: 0;
+          align-items: center;
+          gap: 12px;
+          padding: 0 24px;
+        }
+        .now-playing-info { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+        #now-playing-title { overflow-wrap: anywhere; font-size: 15px; font-weight: 600; }
+        #now-playing-artist { color: var(--secondary-text-color); font-size: 13px; }
+        .cover-art, .cover-placeholder {
+          display: grid;
+          place-items: center;
+          width: 56px;
+          height: 56px;
+          flex: 0 0 56px;
+          overflow: hidden;
+          border-radius: 4px;
+        }
+        .cover-art { object-fit: cover; }
+        .cover-placeholder { color: var(--secondary-text-color); background: var(--secondary-background-color); }
+        .cover-placeholder ha-icon { --mdc-icon-size: 26px; }
         .section { padding: 24px 0; border-top: 1px solid var(--divider-color); }
         .section-heading {
           display: flex;
@@ -225,7 +308,8 @@ class RfidJukeboxPanel extends HTMLElement {
         .search-controls { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 10px; max-width: 720px; }
         .search-results { display: grid; gap: 6px; max-width: 720px; margin: 12px 0 0; padding: 0; list-style: none; }
         .result-button { width: 100%; justify-content: flex-start; min-height: 48px; text-align: left; }
-        .result-title { font-weight: 500; }
+        .result-metadata { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+        .result-title { overflow-wrap: anywhere; font-weight: 500; }
         .result-artist { color: var(--secondary-text-color); }
         .search-message { padding: 12px 2px; color: var(--secondary-text-color); font-size: 14px; }
         .mapping-form { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(160px, 1fr) minmax(220px, 1.5fr) auto; gap: 10px; }
@@ -235,6 +319,7 @@ class RfidJukeboxPanel extends HTMLElement {
         @media (max-width: 700px) {
           :host { padding: 18px 14px 32px; }
           .page-header { align-items: flex-start; flex-direction: column; gap: 16px; }
+          .now-playing { width: 100%; padding: 0; }
           .player-status { width: 100%; max-width: none; }
           .mapping-form { grid-template-columns: 1fr; }
           .search-controls { grid-template-columns: minmax(0, 1fr) auto; }
@@ -246,6 +331,14 @@ class RfidJukeboxPanel extends HTMLElement {
           <div class="heading">
             <span class="heading-icon"><ha-icon icon="mdi:radio-tower"></ha-icon></span>
             <h1>Jukebox RFID</h1>
+          </div>
+          <div class="now-playing" aria-live="polite">
+            <img id="now-playing-cover" class="cover-art" alt="" hidden />
+            <div class="now-playing-info">
+              <span class="player-label">In riproduzione</span>
+              <strong id="now-playing-title">Nessun brano in riproduzione</strong>
+              <span id="now-playing-artist"></span>
+            </div>
           </div>
           <div class="player-status">
             <span class="player-label">Player predefinito</span>
