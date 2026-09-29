@@ -12,7 +12,7 @@ from homeassistant.components.frontend import (
     async_remove_panel,
 )
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
@@ -167,10 +167,17 @@ async def ws_get_config(hass, connection, msg):
 )
 @websocket_api.async_response
 async def ws_search_media(hass, connection, msg):
-    ma_entries = hass.config_entries.async_entries("music_assistant")
+    ma_entries = [
+        e
+        for e in hass.config_entries.async_entries("music_assistant")
+        if e.state == ConfigEntryState.LOADED
+    ]
     if not ma_entries:
         connection.send_error(
-            msg["id"], "no_music_assistant", "Nessuna istanza Music Assistant trovata"
+            msg["id"],
+            "no_music_assistant",
+            "Nessuna istanza Music Assistant caricata (controlla che l'integrazione "
+            "sia configurata e attiva in Impostazioni > Dispositivi e servizi)",
         )
         return
 
