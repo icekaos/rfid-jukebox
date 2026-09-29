@@ -1,0 +1,9 @@
+{
+  "domain": "rfid_jukebox",
+  "name": "RFID Jukebox",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/tuo-user/rfid_jukebox",
+  "iot_class": "local_push",
+  "version": "1.0.0"
+}

@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "RFID Jukebox",
+        "description": "Player Music Assistant da usare quando l'automation non ne specifica uno esplicitamente.",
+        "data": {
+          "default_media_player": "Player predefinito"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "È già configurata un'istanza di RFID Jukebox."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opzioni RFID Jukebox",
+        "data": {
+          "default_media_player": "Player predefinito"
+        }
+      }
+    }
+  }
+}

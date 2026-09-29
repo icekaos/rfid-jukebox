@@ -1,0 +1,5 @@
+{
+  "name": "RFID Jukebox",
+  "render_readme": true,
+  "homeassistant": "2026.6.0"
+}
