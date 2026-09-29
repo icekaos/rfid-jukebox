@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "RFID Jukebox",
-        "description": "Player Music Assistant da usare quando l'automation non ne specifica uno esplicitamente.",
+        "description": "Player Music Assistant usato per riprodurre i tag RFID.",
         "data": {
           "default_media_player": "Player predefinito"
         }

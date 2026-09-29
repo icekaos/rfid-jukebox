@@ -25,25 +25,12 @@ Il player predefinito si può cambiare in qualsiasi momento da **Impostazioni �
 ## Dati
 Salvati in `.storage/rfid_jukebox.tags` (gestito da `Store`, versionato, incluso nei backup HA automatici — coerente con `sensor.backup_last_successful_automatic_backup`).
 
-## Automation ESPHome → play
-Sostituisci `text_sensor.rfid_jukebox_tag_id` col nome reale del text_sensor che pubblichi da ESPHome col tag letto, e `media_player.cameretta_cameretta` col player target.
+## Riproduzione via MQTT
+Non serve creare un'automazione in Home Assistant. Quando l'integrazione MQTT è configurata, pubblica l'UID del tag come testo semplice sul topic `jukebox/play` (ad esempio direttamente da ESPHome). Il componente cerca l'UID tra le associazioni salvate e riproduce il brano sul player predefinito configurato. Se il tag non è ancora conosciuto, lo salva tra le associazioni da completare: lo trovi nel pannello RFID Jukebox e puoi usare **Aggiorna tag** se il pannello è già aperto.
 
-```yaml
-automation:
-  - alias: "Jukebox RFID - riproduci brano"
-    trigger:
-      - platform: state
-        entity_id: text_sensor.rfid_jukebox_tag_id
-    condition:
-      - condition: template
-        value_template: "{{ trigger.to_state.state not in ['unknown', 'none', ''] }}"
-    action:
-      - service: rfid_jukebox.play
-        data:
-          tag_id: "{{ trigger.to_state.state }}"
-```
+Pubblica il messaggio senza retain, così un tag letto in precedenza non viene riprodotto di nuovo quando Home Assistant si riconnette al broker.
 
-`media_player` è ora opzionale: se omesso usa il player predefinito configurato nell'integrazione. Puoi comunque passarlo esplicito (es. `media_player: media_player.cameretta_cameretta`) per un'automation dedicata a una stanza specifica, sovrascrivendo il default per quel caso.
+Il servizio `rfid_jukebox.play` resta disponibile per chiamate manuali o automazioni esistenti. `tag_id` è obbligatorio; `media_player` è opzionale e, se omesso, viene usato il player predefinito. Puoi specificarlo per sovrascrivere il player per una singola chiamata.
 
 ## Note
 - Il pannello include una barra "Cerca brano (Music Assistant)": interroga `music_assistant.search`, che cerca su tutti i provider collegati al server MA — quindi anche Apple Music, se lo hai aggiunto lì. Clicca un risultato per compilare automaticamente titolo e `media_content_id` nel form "Nuova associazione".

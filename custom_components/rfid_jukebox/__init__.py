@@ -6,7 +6,7 @@ from pathlib import Path
 
 import voluptuous as vol
 
-from homeassistant.components import websocket_api
+from homeassistant.components import mqtt, websocket_api
 from homeassistant.components.frontend import (
     async_register_built_in_panel,
     async_remove_panel,
@@ -70,11 +70,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     websocket_api.async_register_command(hass, ws_get_config)
     websocket_api.async_register_command(hass, ws_search_media)
 
-    async def handle_play(call: ServiceCall) -> None:
-        tag_id = call.data["tag_id"]
+    async def async_play_tag(tag_id: str, media_player: str | None = None) -> None:
+        if not tag_id.strip():
+            return
+        tags = hass.data[DOMAIN]["tags"]
+        tag = tags.get(tag_id)
+        if tag is None:
+            tags[tag_id] = {"title": "", "media_content_id": ""}
+            await _save(hass)
+            _LOGGER.info("Nuovo tag RFID aggiunto alle associazioni: %s", tag_id)
+            return
+        if not tag.get("media_content_id"):
+            _LOGGER.info("Tag RFID in attesa di associazione: %s", tag_id)
+            return
+
         # entry.options viene aggiornato in-place quando si salva l'options flow,
         # quindi leggerlo qui riflette sempre l'ultimo valore senza bisogno di reload.
-        media_player = call.data.get("media_player") or entry.options.get(
+        media_player = media_player or entry.options.get(
             CONF_DEFAULT_MEDIA_PLAYER
         )
         if not media_player:
@@ -85,11 +97,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
             return
 
-        tag = hass.data[DOMAIN]["tags"].get(tag_id)
-        if not tag:
-            _LOGGER.warning("Tag RFID sconosciuto: %s", tag_id)
-            return
-
         await hass.services.async_call(
             "music_assistant",
             "play_media",
@@ -97,8 +104,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             blocking=True,
         )
 
+    async def handle_play(call: ServiceCall) -> None:
+        await async_play_tag(
+            call.data["tag_id"], call.data.get("media_player")
+        )
+
     hass.services.async_register(
         DOMAIN, SERVICE_PLAY, handle_play, schema=SERVICE_PLAY_SCHEMA
+    )
+
+    async def handle_mqtt_message(message) -> None:
+        tag_id = message.payload.strip()
+        if tag_id:
+            await async_play_tag(tag_id)
+
+    hass.data[DOMAIN]["mqtt_unsubscribe"] = await mqtt.async_subscribe(
+        hass, "jukebox/play", handle_mqtt_message
     )
 
     return True
@@ -107,6 +128,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async_remove_panel(hass, "rfid-jukebox")
     hass.services.async_remove(DOMAIN, SERVICE_PLAY)
+    hass.data[DOMAIN]["mqtt_unsubscribe"]()
     hass.data.pop(DOMAIN, None)
     return True
 
